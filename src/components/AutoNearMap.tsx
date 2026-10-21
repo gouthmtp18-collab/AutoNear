@@ -5,6 +5,7 @@
 import React, { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet'
 import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { NearbyDriver, PassengerLocation, LOCATION_STALE_THRESHOLD_SECONDS } from '../types'
 import { formatRelativeTime, formatDistance, isLocationStale } from '../utils/geo'
 import { Badge } from './ui'
@@ -16,6 +17,37 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
+
+// ---- Handle map size calculation on mobile/responsive layouts ----
+
+function InvalidateMapSize() {
+  const map = useMap()
+
+  useEffect(() => {
+    // Initial size calculation
+    map.invalidateSize()
+
+    // Additional passes after animations / flex layout settles
+    const timer1 = setTimeout(() => map.invalidateSize(), 150)
+    const timer2 = setTimeout(() => map.invalidateSize(), 500)
+
+    const handleResize = () => {
+      map.invalidateSize()
+    }
+
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('orientationchange', handleResize)
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('orientationchange', handleResize)
+    }
+  }, [map])
+
+  return null
+}
 
 // ---- Custom Icons ----
 
@@ -151,6 +183,7 @@ export default function AutoNearMap({
       />
 
       <ZoomControl position="topleft" />
+      <InvalidateMapSize />
 
       {/* Passenger Location */}
       {passenger && (

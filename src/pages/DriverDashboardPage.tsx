@@ -97,6 +97,14 @@ function DriverDashboardContent() {
   }, [])
 
   const goOnline = () => {
+    if (window.isSecureContext === false && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      setTracking((s) => ({
+        ...s,
+        error: 'Location access is blocked because this page is not served over HTTPS. Mobile browsers require an HTTPS connection for GPS tracking.',
+      }))
+      return
+    }
+
     if (!navigator.geolocation) {
       setTracking((s) => ({
         ...s,

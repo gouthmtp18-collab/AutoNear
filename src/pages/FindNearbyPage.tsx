@@ -49,6 +49,14 @@ function FindNearbyContent() {
   })
 
   const getMyLocation = useCallback(() => {
+    // Insecure contexts on mobile (e.g. testing via http://192.168.x.x) strictly block Geolocation
+    if (window.isSecureContext === false && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      setLocationError(
+        'Location access is blocked because this page is not served over HTTPS. Mobile browsers require an HTTPS connection for GPS / Location.'
+      )
+      return
+    }
+
     if (!navigator.geolocation) {
       setLocationError('Geolocation is not supported by this browser.')
       return
@@ -56,42 +64,56 @@ function FindNearbyContent() {
     setLocationLoading(true)
     setLocationError(null)
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords
-        if (!isValidCoordinate(latitude, longitude)) {
-          setLocationError(
-            'Invalid GPS coordinates received. Please try again with a better signal.'
-          )
+    const tryGetPosition = (highAccuracy: boolean) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude, accuracy } = position.coords
+          if (!isValidCoordinate(latitude, longitude)) {
+            setLocationError(
+              'Invalid GPS coordinates received. Please try again with a better signal.'
+            )
+            setLocationLoading(false)
+            return
+          }
+          setPassenger({ latitude, longitude, accuracy })
           setLocationLoading(false)
-          return
+          setSearchActive(true)
+        },
+        (err) => {
+          // If high accuracy GPS timed out or was unavailable, retry with lower accuracy (Wi-Fi / cellular)
+          if (highAccuracy && (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE)) {
+            tryGetPosition(false)
+            return
+          }
+
+          let msg: string
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              msg =
+                'Location permission denied. Please allow location access in your browser or device settings, then try again.'
+              break
+            case err.POSITION_UNAVAILABLE:
+              msg =
+                'Location unavailable. Please ensure GPS or device location services are enabled.'
+              break
+            case err.TIMEOUT:
+              msg = 'Location request timed out. Please check your GPS signal and try again.'
+              break
+            default:
+              msg = 'Failed to get your location. Please try again.'
+          }
+          setLocationError(msg)
+          setLocationLoading(false)
+        },
+        {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 8000 : 12000,
+          maximumAge: 10000,
         }
-        setPassenger({ latitude, longitude, accuracy })
-        setLocationLoading(false)
-        setSearchActive(true)
-      },
-      (err) => {
-        let msg: string
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            msg =
-              'Location permission denied. Please allow location access in your browser settings, then try again.'
-            break
-          case err.POSITION_UNAVAILABLE:
-            msg =
-              'Location unavailable. Please ensure GPS or network location is enabled on your device.'
-            break
-          case err.TIMEOUT:
-            msg = 'Location request timed out. Please check your GPS signal and try again.'
-            break
-          default:
-            msg = 'Failed to get your location. Please try again.'
-        }
-        setLocationError(msg)
-        setLocationLoading(false)
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    )
+      )
+    }
+
+    tryGetPosition(true)
   }, [])
 
   const handleSearch = () => {
@@ -246,9 +268,9 @@ function FindNearbyContent() {
       </div>
 
       {/* ── Map + Results ─────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden" style={{ minHeight: '500px' }}>
+      <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden min-h-0">
         {/* Map */}
-        <div className="flex-1 relative" style={{ minHeight: '300px' }}>
+        <div className="h-[360px] sm:h-[440px] lg:h-full lg:flex-1 relative w-full shrink-0">
           <Suspense
             fallback={
               <div className="w-full h-full flex items-center justify-center bg-[#111111]">
@@ -267,23 +289,44 @@ function FindNearbyContent() {
           {/* Overlay: not started */}
           {!passenger && (
             <div className="absolute inset-0 flex items-center justify-center
-              bg-[#090909]/75 backdrop-blur-sm pointer-events-none">
-              <div className="text-center px-6">
-                <MapPin className="w-10 h-10 text-[#303030] mx-auto mb-3" />
-                <p className="text-[#A3A3A3] font-medium text-sm">
-                  Click "Use My Current Location" to begin
+              bg-[#090909]/75 backdrop-blur-sm z-[400] p-4">
+              <div className="text-center px-6 py-5 bg-[#171717]/95 border border-[#303030] rounded-2xl shadow-xl max-w-sm w-full">
+                <MapPin className="w-9 h-9 text-[#F5F5F5] mx-auto mb-2.5" />
+                <p className="text-[#F5F5F5] font-semibold text-sm mb-1">
+                  Location Required
                 </p>
-                <p className="text-[#737373] text-xs mt-1">
-                  Your browser will ask for location permission
+                <p className="text-[#737373] text-xs mb-4 leading-relaxed">
+                  Share your location to view nearby auto-rickshaws on the map.
                 </p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    size="sm"
+                    onClick={getMyLocation}
+                    loading={locationLoading}
+                    leftIcon={<Navigation className="w-3.5 h-3.5" />}
+                    className="w-full justify-center"
+                  >
+                    Use My Current Location
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPassenger({ latitude: 12.9716, longitude: 77.5946, accuracy: 100 })
+                      setSearchActive(true)
+                    }}
+                    className="text-xs text-[#A3A3A3] hover:text-[#F5F5F5] underline py-1 transition-colors"
+                  >
+                    Explore with default location (Bengaluru)
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
 
         {/* Results Panel */}
-        <div className="lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l border-[#303030]
-          bg-[#090909] overflow-y-auto flex flex-col"
+        <div className="flex-1 lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l border-[#303030]
+          bg-[#090909] overflow-y-auto flex flex-col min-h-[300px] lg:min-h-0"
           style={{ maxHeight: '100%' }}
         >
           <div className="px-4 py-3 border-b border-[#303030] flex items-center justify-between">
