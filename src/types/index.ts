@@ -51,7 +51,7 @@ export interface PassengerLocation {
 }
 
 export type SortOption = 'distance' | 'name';
-export type RadiusOption = 1 | 3 | 5 | 10;
+export type RadiusOption = 1 | 3 | 5 | 10 | 25 | 50;
 
 export interface SearchFilters {
   radius: RadiusOption;

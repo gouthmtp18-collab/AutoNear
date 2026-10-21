@@ -22,10 +22,12 @@ const RADIUS_OPTIONS: { value: RadiusOption; label: string }[] = [
   { value: 3, label: '3 km' },
   { value: 5, label: '5 km' },
   { value: 10, label: '10 km' },
+  { value: 25, label: '25 km' },
+  { value: 50, label: '50 km' },
 ]
 
 const defaultFilters: SearchFilters = {
-  radius: 10,
+  radius: 50,
   sort: 'distance',
   onlineOnly: true,
 }

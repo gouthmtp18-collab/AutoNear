@@ -33,7 +33,7 @@ const steps = [
     icon: <Map className="w-5 h-5" />,
     title: 'Find Available Autos',
     description:
-      'Search within 1–10 km. See only real, online drivers who have actively shared their live location.',
+      'Search within 1–50 km. See only real, online drivers who have actively shared their live location.',
   },
 ]
 
